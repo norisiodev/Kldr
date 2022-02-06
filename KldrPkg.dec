@@ -1,0 +1,5 @@
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = KldrPkg
+  PACKAGE_GUID                   = 4712ee4d-9796-49cf-ad5a-c252b56f675b
+  PACKAGE_VERSION                = 0.01

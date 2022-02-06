@@ -1,0 +1,20 @@
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Kldr
+  FILE_GUID                      = f2a20831-f5f5-4401-9fe4-b81572d64ddf
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 0.1
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  Kldr.c
+  x86.S
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
