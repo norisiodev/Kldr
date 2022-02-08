@@ -1,3 +1,6 @@
 theme: jekyll-theme-slate
 title: norisio.dev's homepage
 description: this is the Kldr repository page
+google_analytics: G-5P995BZWCC
+plugins:
+  - jekyll-sitemap
