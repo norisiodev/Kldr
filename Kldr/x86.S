@@ -9,11 +9,14 @@
 .text
 
 // rdi:1st argument, rsi:2nd argument
+// rcx:1st argument, rdx:2nd argument
 
 ASM_GLOBAL ASM_PFX(boot_lin64)
 ASM_PFX(boot_lin64):
 
 	cli
+
+	movq	%rdx, %rsi
 
 	movw	$0x18, %ax
 	movw	%ax, %ds
@@ -22,24 +25,24 @@ ASM_PFX(boot_lin64):
 
 	movq	$0x10, %rax
 	pushq	%rax
-	pushq	%rdi
+	pushq	%rcx
 
-	retfq
+	lretq
 
 	ret
 
 ASM_GLOBAL ASM_PFX(chg_csds)
 ASM_PFX(chg_csds):
 
-	movw	%si, %ds
-	movw	%si, %es
-	movw	%si, %ss
+	movw	%dx, %ds
+	movw	%dx, %es
+	movw	%dx, %ss
 
-	pushq	%rdi
+	pushq	%rcx
 	leaq	.ret(%rip), %rax
 	pushq	%rax
 
-	retfq
+	lretq
 .ret:
 
 	ret
@@ -47,14 +50,14 @@ ASM_PFX(chg_csds):
 ASM_GLOBAL ASM_PFX(sgdt)
 ASM_PFX(sgdt):
 
-	sgdt	(%rdi)
+	sgdt	(%rcx)
 
 	ret
 
 ASM_GLOBAL ASM_PFX(lgdt)
 ASM_PFX(lgdt):
 
-	lgdt	(%rdi)
+	lgdt	(%rcx)
 
 	ret
 

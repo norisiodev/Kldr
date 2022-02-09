@@ -18,13 +18,13 @@
 #include <Protocol/UnicodeCollation.h>
 #include <Library/UefiDevicePathLib/UefiDevicePathLib.h>
 
-void boot_lin64(UINT64, UINT64);
-void sgdt(UINT64);
-void lgdt(UINT64);
-UINT64 getcs(void);
-UINT64 getds(void);
-UINT64 getss(void);
-UINT64 chg_csds(UINT64 cs, UINT64 ds);
+EFIAPI void boot_lin64(UINT64, UINT64);
+EFIAPI void sgdt(UINT64);
+EFIAPI void lgdt(UINT64);
+EFIAPI UINT64 getcs(void);
+EFIAPI UINT64 getds(void);
+EFIAPI UINT64 getss(void);
+EFIAPI UINT64 chg_csds(UINT64 cs, UINT64 ds);
 
 #pragma pack(push, 1)
 
