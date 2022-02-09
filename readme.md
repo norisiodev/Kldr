@@ -62,16 +62,16 @@ Note: The following is an execution example.
 
 ## How to build.
 
-1. Install the EDK II on the linux system.
+1. Install the EDK II on the linux or intel mac system.
 
 2. Change current directory to edk2.
 
 3. Set up the edk2 build environment.
 
-    Run following command with bash.
+    Run following command with bash or zsh.
 
     ``` sh
-    . edksetup.sh
+    source edksetup.sh
     ```
 
 
@@ -80,7 +80,8 @@ Note: The following is an execution example.
     ACTIVE_PLATFORM       = KldrPkg/KldrPkg.dsc
     TARGET                = RELEASE
     TARGET_ARCH           = X64
-    TOOL_CHAIN_TAG        = GCC5
+    TOOL_CHAIN_TAG        = GCC5        # for linux
+    TOOL_CHAIN_TAG        = XCODE5      # for intel mac
     ```
 
 5. Clone Kldr repository and rename the Kldr to KldrPkg.
