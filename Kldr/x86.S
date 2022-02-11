@@ -6,9 +6,9 @@
  * SPDX short identifier: MIT
  *
  */
+
 .text
 
-// rdi:1st argument, rsi:2nd argument
 // rcx:1st argument, rdx:2nd argument
 
 ASM_GLOBAL ASM_PFX(boot_lin64)
@@ -47,15 +47,15 @@ ASM_PFX(chg_csds):
 
 	ret
 
-ASM_GLOBAL ASM_PFX(sgdt)
-ASM_PFX(sgdt):
+ASM_GLOBAL ASM_PFX(_sgdt)
+ASM_PFX(_sgdt):
 
 	sgdt	(%rcx)
 
 	ret
 
-ASM_GLOBAL ASM_PFX(lgdt)
-ASM_PFX(lgdt):
+ASM_GLOBAL ASM_PFX(_lgdt)
+ASM_PFX(_lgdt):
 
 	lgdt	(%rcx)
 

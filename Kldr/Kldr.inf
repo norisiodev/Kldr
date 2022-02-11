@@ -4,12 +4,13 @@
   BASE_NAME                      = Kldr
   FILE_GUID                      = f2a20831-f5f5-4401-9fe4-b81572d64ddf
   MODULE_TYPE                    = UEFI_APPLICATION
-  VERSION_STRING                 = 0.2
+  VERSION_STRING                 = 0.3
   ENTRY_POINT                    = UefiMain
 
 [Sources]
   Kldr.c
   x86.S
+  x86.asm
 
 [Packages]
   MdePkg/MdePkg.dec

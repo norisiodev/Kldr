@@ -18,13 +18,13 @@
 #include <Protocol/UnicodeCollation.h>
 #include <Library/UefiDevicePathLib/UefiDevicePathLib.h>
 
-EFIAPI void boot_lin64(UINT64, UINT64);
-EFIAPI void sgdt(UINT64);
-EFIAPI void lgdt(UINT64);
-EFIAPI UINT64 getcs(void);
-EFIAPI UINT64 getds(void);
-EFIAPI UINT64 getss(void);
-EFIAPI UINT64 chg_csds(UINT64 cs, UINT64 ds);
+void EFIAPI boot_lin64(UINT64, UINT64);
+void EFIAPI _sgdt(UINT64);
+void EFIAPI _lgdt(UINT64);
+UINT64 EFIAPI getcs(void);
+UINT64 EFIAPI getds(void);
+UINT64 EFIAPI getss(void);
+UINT64 EFIAPI chg_csds(UINT64 cs, UINT64 ds);
 
 #pragma pack(push, 1)
 
@@ -349,7 +349,7 @@ EFI_STATUS chk_linux(setup_header* header)
       return EFI_NOT_FOUND;
    }
 
-   //Print(L "boot protocol ver.%d.%d\r\n", header->version >> 8, header->version & 0xff);
+   //Print(L"boot protocol ver.%d.%d\r\n", header->version >> 8, header->version & 0xff);
 
    if (header->version < 0x020a) { // old boot protocol is not supported
       return EFI_UNSUPPORTED;
@@ -373,34 +373,44 @@ EFI_STATUS chk_linux(setup_header* header)
 VOID initE820(boot_params* params, UINT8* MemoryMap, UINTN MapSize, UINTN DescSize)
 {
    UINTN       Count = MapSize / DescSize;
-   e820_entry  e820[Count];
+   e820_entry  e820[E820_MAX_ENTRIES_ZEROPAGE];
+   UINT8       e_count;
    UINT8*      tmp;
 
    tmp = MemoryMap;
-   for (int i = 0; i < Count; ++i) {
-      cnv_efi_to_acpi(&e820[i], (EFI_MEMORY_DESCRIPTOR*)tmp);
+   e_count = 0;
+   for (UINTN i = 0; i < Count; ++i) {
+      e820_entry  entry;
+      cnv_efi_to_acpi(&entry, (EFI_MEMORY_DESCRIPTOR*)tmp);
+
+      if (e_count == 0) {
+         CopyMem(&e820[e_count], &entry, sizeof(e820_entry));
+         ++e_count;
+
+      } else {
+         if (entry.type == e820[e_count - 1].type
+          && entry.addr == e820[e_count - 1].addr + e820[e_count - 1].size) {
+            e820[e_count - 1].size += entry.size;
+
+         } else {
+            CopyMem(&e820[e_count], &entry, sizeof(e820_entry));
+            ++e_count;
+
+            if (e_count == E820_MAX_ENTRIES_ZEROPAGE) {
+               break;
+            }
+         }
+      }
 
       tmp += DescSize;
    }
 
-   for (int i = Count - 1; i >= 1; --i) {
-      if (e820[i].type == e820[i - 1].type) {
-         if (e820[i - 1].addr + e820[i - 1].size == e820[i].addr) {
-            e820[i - 1].size += e820[i].size;
-            for (int j = i; j < Count - 1; ++j) {
-               e820[j] = e820[j + 1];
-            }
-            --Count;
-         }
-      }
-   }
-
-   for (int i = 0; i < Count && i < E820_MAX_ENTRIES_ZEROPAGE; ++i) {
+   for (int i = 0; i < e_count; ++i) {
       params->e820_table[i].addr = e820[i].addr;
       params->e820_table[i].size = e820[i].size;
       params->e820_table[i].type = e820[i].type;
    }
-   params->e820_entries = Count;
+   params->e820_entries = e_count;
 }
 
 UINT64 FindRSDP(VOID)
@@ -414,9 +424,9 @@ UINT64 FindRSDP(VOID)
    return 0;
 }
 
-UINTN count_bits(UINT32 c)
+UINT8 count_bits(UINT32 c)
 {
-   UINTN bits = 0;
+   UINT8 bits = 0;
 
    while (c) {
       if (c & 0x01) {
@@ -428,9 +438,9 @@ UINTN count_bits(UINT32 c)
    return bits;
 }
 
-UINTN start_bit(UINT32 c)
+UINT8 start_bit(UINT32 c)
 {
-   UINTN n = 0;
+   UINT8 n = 0;
 
    if (!c) {
       return 0;
@@ -490,7 +500,7 @@ EFI_STATUS setup_desc(GDTR* gdtr, UINT64* cs, UINT64* ds)
    DESC* new_desc;
    UINTN new_desc_size;
 
-   sgdt((UINT64)gdtr);
+   _sgdt((UINT64)gdtr);
 
    //Print(L"sgdt.limit = %x, ", gdtr->limit);
    //Print(L"sgdt.addr  = %lx\r\n", gdtr->addr);
@@ -498,6 +508,9 @@ EFI_STATUS setup_desc(GDTR* gdtr, UINT64* cs, UINT64* ds)
    //dump_gdt(gdtr);
 
    new_desc_size = gdtr->limit + 1 + sizeof(DESC) * 2;
+   if (new_desc_size > 0x10000) {
+      return EFI_OUT_OF_RESOURCES;
+   }
    *cs = gdtr->limit + 1;
    *ds = *cs + 0x08;
 
@@ -508,7 +521,7 @@ EFI_STATUS setup_desc(GDTR* gdtr, UINT64* cs, UINT64* ds)
 
    CopyMem((VOID*)new_desc, (VOID*)gdtr->addr, gdtr->limit + 1);
 
-   gdtr->limit = new_desc_size - 1;
+   gdtr->limit = (UINT16)(new_desc_size - 1);
    gdtr->addr = (UINT64)new_desc;
 
    modify_gdt(gdtr, *cs, *ds);
@@ -844,8 +857,8 @@ EFI_STATUS setup_graphics(boot_params* params, UINT32* orig)
       return Status;
    }
 
-   params->screen_info.lfb_width  = ginfo->HorizontalResolution;
-   params->screen_info.lfb_height = ginfo->VerticalResolution;
+   params->screen_info.lfb_width  = (UINT16)ginfo->HorizontalResolution;
+   params->screen_info.lfb_height = (UINT16)ginfo->VerticalResolution;
 
    switch (ginfo->PixelFormat) {
       case PixelRedGreenBlueReserved8BitPerColor:
@@ -908,9 +921,9 @@ EFI_STATUS setup_graphics(boot_params* params, UINT32* orig)
    params->screen_info.lfb_base = gout->Mode->FrameBufferBase & 0xffffffff;
    params->screen_info.ext_lfb_base = gout->Mode->FrameBufferBase >> 32;
 
-   params->screen_info.lfb_size = gout->Mode->FrameBufferSize;
+   params->screen_info.lfb_size = (UINT32)gout->Mode->FrameBufferSize;
 
-   params->screen_info.lfb_linelength = ginfo->PixelsPerScanLine
+   params->screen_info.lfb_linelength = (UINT16)ginfo->PixelsPerScanLine
       * ((params->screen_info.lfb_depth + 7) / 8);
 
    params->screen_info.capabilities = 0x02; // VIDEO_CAPABILITY_64BIT_BASE
@@ -993,9 +1006,9 @@ EFI_STATUS init_memory_map(UINTN* Key, boot_params* params)
 
    // "EL64";
    params->efi_info.efi_loader_signature = 'E' + ('L' << 8) + ('6' << 16) + ('4' << 24);
-   params->efi_info.efi_memdesc_size = DescSize;
+   params->efi_info.efi_memdesc_size = (UINT32)DescSize;
    params->efi_info.efi_memdesc_version = DescVer;
-   params->efi_info.efi_memmap_size = MapSize;
+   params->efi_info.efi_memmap_size = (UINT32)MapSize;
 
    params->efi_info.efi_systab = (UINT64)gST & 0xffffffff;
    params->efi_info.efi_systab_hi = ((UINT64)gST >> 32);
@@ -1111,7 +1124,7 @@ EFI_STATUS boot_linux(VOID)
       return Status;
    }
 
-   lgdt((UINT64)&gdtr);
+   _lgdt((UINT64)&gdtr);
    chg_csds(tmp_cs, tmp_ds);
    modify_gdt(&gdtr, 0x10, 0x18);
 
@@ -1228,9 +1241,9 @@ EFI_STATUS get_var_word(CHAR16* name, UINT16* var)
    return EFI_SUCCESS;
 }
 
-int find_order(UINT16* order, UINTN count, UINTN n)
+INTN find_order(UINT16* order, INTN count, UINTN n)
 {
-   for (UINTN i = 0; i < count; ++i) {
+   for (INTN i = 0; i < count; ++i) {
       if (order[i] == n) {
          return i;
       }
@@ -1239,16 +1252,16 @@ int find_order(UINT16* order, UINTN count, UINTN n)
    return -1;
 }
 
-VOID move_top(UINT16* order, UINTN count, UINTN n)
+VOID move_top(UINT16* order, INTN count, UINT16 n)
 {
-   int index;
+   INTN index;
 
    index = find_order(order, count, n);
    if (index == -1) {
       return;
    }
 
-   for (int i = index - 1; 0 <= i; --i) {
+   for (INTN i = index - 1; 0 <= i; --i) {
       order[i + 1] = order[i];
    }
 
@@ -1287,9 +1300,14 @@ EFI_STATUS get_param(UINTN* boot, UINTN* install, UINTN* chg_order)
    *chg_order = 1;
 
    if (params->LoadOptionsSize) {
-      CHAR16   str[params->LoadOptionsSize / sizeof(CHAR16) + 1];
+      CHAR16*  str;
       CHAR16*  p;
       CHAR16*  end;
+
+      str = malloc_pool(params->LoadOptionsSize / sizeof(CHAR16) + 1);
+      if (!str) {
+         return EFI_OUT_OF_RESOURCES;
+      }
 
       CopyMem(str, params->LoadOptions, params->LoadOptionsSize);
       str[params->LoadOptionsSize / sizeof(CHAR16)] = 0;
@@ -1323,6 +1341,7 @@ EFI_STATUS get_param(UINTN* boot, UINTN* install, UINTN* chg_order)
          }
          p = n + 1;
       }
+      free_pool(str);
    }
 
    Status = gBS->CloseProtocol(gImageHandle, &li_guid, gImageHandle, NULL);
@@ -1333,9 +1352,9 @@ EFI_STATUS get_param(UINTN* boot, UINTN* install, UINTN* chg_order)
    return Status;
 }
 
-EFI_STATUS assign_order(INTN* norder)
+EFI_STATUS assign_order(UINT16* norder)
 {
-   for (INTN order = 0; order <= 0x10000; ++order) {
+   for (INTN order = 0; order < 0x10000; ++order) {
       CHAR16   varname[16];
       UINTN    size;
       UINT8*   var;
@@ -1344,7 +1363,7 @@ EFI_STATUS assign_order(INTN* norder)
 
       var = get_var(varname, &size);
       if (!var) {
-         *norder = order;
+         *norder = (UINT16)order;
          return EFI_SUCCESS;
       }
 
@@ -1522,7 +1541,7 @@ EFI_STATUS get_max_size(UINT64* size)
 
 EFI_STATUS install_boot_order(const CHAR16* desc, VOID* opt_data, UINTN opt_size)
 {
-   INTN     order;
+   UINT16   order;
    CHAR16   varname[16];
 
    EFI_LOAD_OPTION   *elo;
@@ -1551,6 +1570,11 @@ EFI_STATUS install_boot_order(const CHAR16* desc, VOID* opt_data, UINTN opt_size
    if (!dp) {
       return EFI_OUT_OF_RESOURCES;
    }
+   
+   if (dp_size > 0x10000) {
+      free_pool(dp);
+      return EFI_OUT_OF_RESOURCES;
+   }
 
    size = sizeof(EFI_LOAD_OPTION) + desc_size + dp_size + opt_size;
 
@@ -1567,7 +1591,7 @@ EFI_STATUS install_boot_order(const CHAR16* desc, VOID* opt_data, UINTN opt_size
    // EFI_LOAD_OPTION
    elo = (EFI_LOAD_OPTION*)var;
    elo->Attributes = LOAD_OPTION_ACTIVE;
-   elo->FilePathListLength = dp_size;
+   elo->FilePathListLength = (UINT16)dp_size;
 
    // Desc
    CopyMem(var + sizeof(EFI_LOAD_OPTION), desc, desc_size);
