@@ -74,23 +74,13 @@ Note: The following is an execution example.
 
 3. Set up the edk2 build environment.
 
-    - linux
-
-        Run following command with bash or zsh.
-
-        ``` sh
-        source edksetup.sh
-        ```
-
-    - mac
+    - linux or mac
 
         Run following commands with bash or zsh.
 
         ``` sh
         source edksetup.sh
-        cd BaseTools\Source\C
-        make
-        cd ..\..\..
+        make -C BaseTools/Source/C
         ```
 
     - Windows
